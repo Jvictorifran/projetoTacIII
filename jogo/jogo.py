@@ -10,7 +10,6 @@ from jogo.mundo import Mundo
 
 MENU, JOGANDO, FIM = "menu", "jogando", "fim"
 
-
 class Particula:
     def __init__(self, x, y, cor):
         self.x, self.y = x, y

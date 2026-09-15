@@ -32,6 +32,8 @@ MAX_ZUMBIS = 80
 # --- Entidades ---
 HUMANO_L = 24
 HUMANO_A = 34
+CAIXA_L = 50
+CAIXA_A = 50
 VEL_HUMANO = 215.0          # correndo em panico
 VEL_PASSEIO = 45.0          # antes de ver a horda
 RAIO_PANICO = 340.0
@@ -59,3 +61,4 @@ COR_OBSTACULO_ESCURO = (140, 44, 44)
 COR_MOEDA = (250, 200, 60)
 COR_TEXTO = (245, 245, 245)
 COR_SOMBRA = (0, 0, 0)
+COR_CAIXA = (211, 175, 55)

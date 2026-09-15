@@ -7,6 +7,26 @@ import pygame
 
 from jogo import config as cfg
 
+class Box:
+    altura, largura = cfg.CAIXA_A, cfg.CAIXA_L
+    def __init__(self, x, y):
+        self.x = float(x)
+        self.y = float(y)
+        self.vivo = True
+        self.poder = random.choice(['poder1', 'poder2', 'poder3', 'poder4'])
+
+    @property
+    def rect(self):
+        return pygame.Rect(
+            int(self.x - self.largura/2),
+            int(self.y - self.altura),
+            self.largura,
+            self.altura,
+        )
+
+    def colidir(self):
+        self.vivo = False
+        return self.poder
 
 class Corpo:
     """Base com fisica simples de plataforma (gravidade + colisao com o chao)."""
