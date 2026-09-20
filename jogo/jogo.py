@@ -5,6 +5,7 @@ import random
 import pygame
 
 from jogo import config as cfg
+from jogo import recursos
 from jogo.entidades import Zumbi
 from jogo.mundo import Mundo
 
@@ -36,6 +37,7 @@ class Jogo:
         pygame.init()
         self.tela = pygame.display.set_mode((cfg.LARGURA, cfg.ALTURA))
         pygame.display.set_caption(cfg.TITULO)
+        recursos.carregar()     # sprites prontos antes do primeiro quadro
         self.relogio = pygame.time.Clock()
         self.fonte = pygame.font.SysFont("arialbold,arial", 24, bold=True)
         self.fonte_g = pygame.font.SysFont("arialbold,arial", 56, bold=True)
@@ -54,7 +56,7 @@ class Jogo:
         self.buffer_pulo = 0.0
         self.particulas = []
         self.tremor = 0.0
-        self.zumbis = [Zumbi(cfg.X_LIDER, cfg.CHAO_Y, 0)]
+        self.zumbis = [Zumbi(cfg.X_LIDER, cfg.CHAO_Y, 0, tipo=0)]
 
     @property
     def metros(self):

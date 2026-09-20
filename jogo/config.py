@@ -29,6 +29,15 @@ ZUMBI_A = 34
 LARG_FORMACAO = 5           # zumbis por coluna antes de recuar
 MAX_ZUMBIS = 80
 
+# --- Sprites da horda ---
+ZUMBI_SPRITE_A = 46         # altura desenhada (o hitbox continua ZUMBI_A)
+ZUMBI_FPS_ANIM = 15         # quadros por segundo do ciclo de corrida
+QUADRO_SUBINDO = 3          # pernas recolhidas
+QUADRO_CAINDO = 0           # pernas abertas, pronto pra pousar
+SOMBRA_LINHA = 0.06         # quanto cada linha de tras escurece
+ESCALA_LINHA = 0.05         # quanto cada linha de tras encolhe
+RECUO_LINHA = 9             # quanto cada linha de tras sobe na tela
+
 # --- Entidades ---
 HUMANO_L = 24
 HUMANO_A = 34

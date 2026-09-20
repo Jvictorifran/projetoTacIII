@@ -24,6 +24,9 @@ python3 -m venv venv
 
 - **Horda**: comeca com 1 zumbi e todos pulam juntos; a formacao se aperta
   conforme cresce, ate 80 zumbis.
+- **Sprites animados**: 5 tipos de zumbi sorteados por entidade (garoto,
+  policial, mumia, frankenstein, garota), com ciclo de corrida de 5 quadros e
+  poses fixas de subida e queda no ar.
 - **Contagio**: encostar num humano converte ele em zumbi (+1 na horda).
 - **Obstaculos**: carros com 1 a 4 de vida; cada zumbi que bate morre e tira
   1 de vida do carro. Sem zumbis = fim de jogo.
@@ -41,11 +44,32 @@ python3 -m venv venv
 
 ```
 main.py              ponto de entrada
-jogo/config.py       constantes de fisica, cores e balanceamento
+jogo/config.py       constantes de fisica, cores, sprites e balanceamento
+jogo/recursos.py     carga das folhas de sprite (fatia, corta, escala, cacheia)
 jogo/entidades.py    Corpo, Zumbi, Humano, Obstaculo, Moeda
 jogo/mundo.py        geracao procedural do cenario e desenho do fundo
 jogo/jogo.py         loop principal, estados, colisoes e HUD
+assets/image/        folhas de sprite dos zumbis (5 quadros de 256x256)
 ```
+
+## Sprites
+
+`assets/image/zombie*.png` sao folhas de 1280x256: 5 quadros de corrida lado a
+lado, todos virados pra direita (a horda so corre pra frente).
+
+`jogo/recursos.py` faz o preparo uma vez so, na abertura da janela:
+
+1. fatia a folha em quadros quadrados;
+2. corta o vazio usando **a uniao** das caixas dos 5 quadros — um corte por
+   quadro mudaria a ancora e faria a animacao tremer;
+3. escala pra `ZUMBI_SPRITE_A` e gera uma copia por linha da formacao, menor
+   (`ESCALA_LINHA`) e mais escura (`SOMBRA_LINHA`) quanto mais atras.
+
+Como as 5 linhas ja saem prontas do cache, desenhar 80 zumbis custa so 80
+blits (~3 ms por quadro). O hitbox continua sendo `ZUMBI_L x ZUMBI_A`: o
+sprite e maior que ele de proposito, entao mexer na escala nao mexe no
+balanceamento. Sem a pasta `assets/image`, o jogo volta sozinho pras formas
+geometricas.
 
 ## Regras de geracao (balanceamento)
 
@@ -60,6 +84,7 @@ O alcance do pulo e `velocidade * tempo_no_ar`. A partir dele:
 
 ## Proximos passos
 
-- sprites e sons no lugar das formas geometricas
+- sprites de humanos, carros e moedas (hoje so os zumbis tem arte)
+- efeitos sonoros e trilha
 - power-ups (zumbi gigante, dragao, balao) e predios pra escalar
 - salvar recorde em arquivo e tela de melhores pontuacoes

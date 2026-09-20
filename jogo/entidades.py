@@ -6,6 +6,7 @@ import random
 import pygame
 
 from jogo import config as cfg
+from jogo import recursos
 
 class Box:
     altura, largura = cfg.CAIXA_A, cfg.CAIXA_L
@@ -75,11 +76,15 @@ class Zumbi(Corpo):
     largura = cfg.ZUMBI_L
     altura = cfg.ZUMBI_A
 
-    def __init__(self, x, y, indice):
+    def __init__(self, x, y, indice, tipo=None):
         super().__init__(x, y)
         self.indice = indice
         self.fase = random.uniform(0, math.tau)   # anima o balanco das pernas
         self.tremor = random.uniform(-4, 4)
+        tipos = recursos.total_tipos()
+        # cada zumbi puxa um sprite diferente: a massa fica menos repetitiva
+        self.tipo = tipo if tipo is not None else (random.randrange(tipos) if tipos else 0)
+        self.anim = random.uniform(0, 5)          # comeca fora de sincronia
 
     def deslocamento_formacao(self, total):
         """Posicao relativa ao lider dentro do bloco da horda.
@@ -97,6 +102,7 @@ class Zumbi(Corpo):
         # aproximacao suave do slot na formacao
         self.x += (alvo - self.x) * min(1.0, dt * 7.0)
         self.fase += dt * 12
+        self.anim += dt * cfg.ZUMBI_FPS_ANIM
         self.aplicar_fisica(dt, mundo)
 
     def pular(self):
@@ -105,12 +111,28 @@ class Zumbi(Corpo):
             self.no_chao = False
             self.coyote = 0.0
 
+    def quadro(self):
+        """Indice do quadro: no ar a pose e fixa, no chao roda o ciclo."""
+        if not self.no_chao:
+            return cfg.QUADRO_SUBINDO if self.vy < 0 else cfg.QUADRO_CAINDO
+        return int(self.anim)
+
     def desenhar(self, tela, camera_x):
-        pulo = math.sin(self.fase) * 3 if self.no_chao else 0
         # linhas de tras sobem um pouco e escurecem: da profundidade a massa
         linha = self.indice % cfg.LARG_FORMACAO
-        r = self.rect.move(-camera_x, -pulo - linha * 5)
-        sombra = 1.0 - linha * 0.11
+        sprite = recursos.zumbi(self.tipo, self.quadro(), linha)
+        if sprite is None:
+            self._desenhar_formas(tela, camera_x, linha)
+            return
+        r = sprite.get_rect()
+        r.midbottom = (int(self.x - camera_x), int(self.y) - linha * cfg.RECUO_LINHA)
+        tela.blit(sprite, r)
+
+    def _desenhar_formas(self, tela, camera_x, linha):
+        """Desenho de reserva, usado quando nao ha sprite carregado."""
+        pulo = math.sin(self.fase) * 3 if self.no_chao else 0
+        r = self.rect.move(-camera_x, -pulo - linha * cfg.RECUO_LINHA)
+        sombra = 1.0 - linha * cfg.SOMBRA_LINHA
         claro = tuple(int(c * sombra) for c in cfg.COR_ZUMBI)
         escuro = tuple(int(c * sombra) for c in cfg.COR_ZUMBI_ESCURO)
         # contorno escuro separa os zumbis dentro da massa
