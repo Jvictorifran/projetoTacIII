@@ -23,6 +23,9 @@ NIVEIS = 3                  # quantidade de alturas possiveis
 INICIO_SEGURO = 2600        # trecho inicial sem obstaculos
 TETO = 60                   # a horda nunca sobe alem disso, mesmo com poder
 PX_POR_METRO = 50           # escala do placar de distancia
+FOLGA_BEIRADA = 24          # pe ate isso abaixo da beirada ainda sobe nela
+BURACO_SOMBRA = 105         # opacidade (0-255) da sombra no fundo do buraco
+BURACO_SOMBRA_LADO = 22     # largura da sombra que cada parede joga no vao
 
 # --- Cenarios de fundo ---
 FUNDO_TROCA_M = 250         # a cada quantos metros tem um tunel e o cenario muda
@@ -66,21 +69,29 @@ CAIXA_PRIMEIRA_X = 900      # a primeira caixa vem cedo, pra ensinar o poder
 
 # --- Poderes ---
 ICONE_HUD = 34              # tamanho do icone do poder no HUD
-GIGANTE_ESCALA = 1.75       # quanto o zumbi cresce
+ICONE_LOJA = 44             # tamanho do icone de cada item da loja
+MONSTRO_CHANCE = 0.4        # chance do mordido virar um monstro comprado na loja
+CHANCE_ZUMBIS = 3           # com quantos zumbis a segunda chance devolve a horda
+CHANCE_VOO = 3.5            # segundos de voo na volta, pra nao renascer num buraco
 GIGANTE_ALCANCE = 20        # folga extra do hitbox enquanto gigante
 DRAGAO_SUBIDA = -300.0      # px/s segurando o pulo
 DRAGAO_DESCIDA = 180.0      # px/s soltando
 DRAGAO_TETO = 110           # altura maxima do voo
-DRAGAO_ASAS_A = 150         # altura da arte das asas em cache
-DRAGAO_ASAS_FOLGA = 140     # quanto as asas passam da largura da horda
 DRAGAO_FPS_ASAS = 9
+DRAGAO_ALTURA = (120, 190)  # altura do dragao: horda pequena -> horda cheia
+GIGANTAO_ALTURA = (120, 200)    # altura do zumbi gigante: idem
 BALAO_GRAVIDADE = 0.55      # multiplicador da gravidade
 BALAO_PULO = 0.72           # pulo mais fraco: com a queda lenta ele ja sobe muito
 BALAO_PULOS_EXTRA = 1       # pulos disponiveis no ar
-BALAO_SPRITE_A = 30         # balao desenhado acima do zumbi
+BALAO_SPRITE_A = 34         # balao desenhado acima do zumbi
+BALAO_FIO = 16              # comprimento do barbante
 IMA_RAIO = 320.0            # de quao longe a moeda e puxada
 IMA_VELOCIDADE = 8.0        # quao rapido ela chega
 IMA_MULTIPLICADOR = 2       # moeda vale em dobro
+IMA_SPRITE_A = 40           # ima que flutua em cima do lider
+IMA_ONDAS = 3               # aneis de atracao saindo dele
+FIM_ESPERA = 3.0            # segundos do placar final antes de voltar ao menu
+FIM_TRAVA = 0.6             # nesse comeco o placar ignora tecla (pulo atrasado)
 
 # --- Entidades ---
 HUMANO_L = 24

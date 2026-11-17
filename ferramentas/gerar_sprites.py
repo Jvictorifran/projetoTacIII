@@ -296,19 +296,29 @@ def _icone_dragao():
     return reduzir(surf, ICONE)
 
 
-def _icone_balao():
-    """Balao com barbante: o poder que faz a horda flutuar."""
+CORES_BALAO = ((228, 76, 84), (250, 190, 60), (84, 170, 232),
+               (132, 204, 96), (190, 110, 220))
+
+
+def _icone_balao(cor=CORES_BALAO[0]):
+    """Um balao sem barbante (o jogo desenha o fio ate a mao do zumbi)."""
     surf = nova_tela(ICONE)
-    vermelho = (228, 76, 84)
-    pontos = [(64, 106)]
-    for i in range(9):                                  # barbante ondulado
-        t = i / 8
-        pontos.append((64 + math.sin(t * 7) * 9, 106 + t * 20))
-    pygame.draw.lines(surf, PRETO, False, _eps(pontos), int(_e(3.4)))
-    elipse_contornada(surf, (64, 58), 34, 40, vermelho)
-    poligono_contornado(surf, [(56, 94), (72, 94), (64, 108)], vermelho)
-    elipse(surf, (50, 42), 10, 14, clarear(vermelho, 0.55))
+    poligono_contornado(surf, [(55, 104), (73, 104), (64, 120)], escurecer(cor, 0.8))
+    elipse_contornada(surf, (64, 60), 40, 48, cor)
+    # sombra na barriga e dois brilhos: e o que tira a cara de bola chapada
+    elipse(surf, (72, 70), 30, 36, escurecer(cor, 0.9))
+    elipse(surf, (62, 58), 34, 42, cor)
+    elipse(surf, (46, 40), 9, 15, clarear(cor, 0.65))
+    elipse(surf, (54, 26), 5, 4, clarear(cor, 0.8))
     return reduzir(surf, ICONE)
+
+
+def _folha_baloes():
+    """Os baloes de todas as cores lado a lado, um quadro por cor."""
+    folha = pygame.Surface((ICONE * len(CORES_BALAO), ICONE), pygame.SRCALPHA)
+    for i, cor in enumerate(CORES_BALAO):
+        folha.blit(_icone_balao(cor), (i * ICONE, 0))
+    return folha
 
 
 def _icone_ima():
@@ -369,17 +379,18 @@ ICONES = {
 
 
 def gerar_poderes():
+    # os icones poder_*.png agora saem de ferramentas/importar_sprites.py;
+    # daqui so vem o que aparece com o poder ligado (baloes e ima) e a caixa
     print("poderes:")
-    for nome, desenhar in ICONES.items():
-        salvar(desenhar(), f"poder_{nome}.png")
-    salvar(_sprite_asas(), "asas.png")
+    salvar(_folha_baloes(), "baloes.png")   # um balao por zumbi, cor sorteada
+    salvar(_icone_ima(), "ima.png")         # o ima que flutua sobre o lider
     salvar(_sprite_caixa(), "caixa.png")
 
 
 if __name__ == "__main__":
     pygame.init()
     os.makedirs(RAIZ, exist_ok=True)
-    # os humanos agora saem das folhas de zumbi (ferramentas/gerar_humanos.py);
-    # chamar gerar_humanos() aqui regravaria os human*.png com o traco antigo
+    # zumbis e humanos agora vem de pacotes prontos
+    # (ferramentas/importar_sprites.py): gerar_humanos() ficou sem uso
     gerar_poderes()
     pygame.quit()

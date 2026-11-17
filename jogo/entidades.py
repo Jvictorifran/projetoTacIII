@@ -79,6 +79,29 @@ class Corpo:
         self.no_chao = False
         self.coyote = 0.0
         self.vivo = True
+        self.na_parede = False     # encostado na parede de um buraco
+        self.bateu = False         # acabou de bater nela (o jogo le e zera)
+
+    def andar(self, novo_x, mundo):
+        """Anda ate `novo_x`, mas para na parede da plataforma da frente.
+
+        Quem cai no buraco nao atravessa mais o chao do outro lado: da de
+        cara na parede e escorrega por ela ate sumir la embaixo.
+        """
+        if novo_x > self.x:
+            meia = self.largura / 2
+            parede = mundo.parede_em(novo_x + meia, self.y)
+            # vale tambem pra quem ja enfiou a frente na parede enquanto
+            # ainda estava na folga da beirada e depois caiu abaixo dela
+            if parede is not None and self.x <= parede + meia:
+                novo_x = min(novo_x, parede - meia)
+                if not self.na_parede:
+                    self.bateu = True
+                self.na_parede = True
+                self.x = novo_x
+                return
+        self.na_parede = False
+        self.x = novo_x
 
     @property
     def rect(self):
@@ -97,7 +120,7 @@ class Corpo:
         topo = mundo.chao_em(self.x)
         if topo is not None and self.vy >= 0 and self.y >= topo:
             # so "cai" na plataforma se vinha de cima dela
-            if self.y - self.vy * dt <= topo + 24:
+            if self.y - self.vy * dt <= topo + cfg.FOLGA_BEIRADA:
                 self.y = topo
                 self.vy = 0.0
                 self.no_chao = True
@@ -122,9 +145,9 @@ class Zumbi(Corpo):
         self.indice = indice
         self.fase = random.uniform(0, math.tau)   # anima o balanco das pernas
         self.tremor = random.uniform(-4, 4)
-        tipos = recursos.total_tipos()
         # cada zumbi puxa um sprite diferente: a massa fica menos repetitiva
-        self.tipo = tipo if tipo is not None else (random.randrange(tipos) if tipos else 0)
+        base = recursos.tipos_base()
+        self.tipo = tipo if tipo is not None else (random.choice(base) if base else 0)
         self.anim = random.uniform(0, 5)          # comeca fora de sincronia
         self.pulos = 0                            # pulos gastos desde o chao
 
@@ -146,7 +169,12 @@ class Zumbi(Corpo):
     def atualizar(self, dt, mundo, alvo_lider_x, total=1, poder=None, subindo=False):
         alvo = alvo_lider_x + self.deslocamento_formacao(total)
         # aproximacao suave do slot na formacao
-        self.x += (alvo - self.x) * min(1.0, dt * 7.0)
+        novo_x = self.x + (alvo - self.x) * min(1.0, dt * 7.0)
+        if poder == poderes.DRAGAO:
+            self.x = novo_x             # voando ninguem bate em parede
+            self.na_parede = False
+        else:
+            self.andar(novo_x, mundo)
         self.fase += dt * 12
         self.anim += dt * cfg.ZUMBI_FPS_ANIM
 
@@ -207,13 +235,15 @@ class Zumbi(Corpo):
         return int(self.anim)
 
     # ------------------------------------------------------------- desenho
-    def desenhar(self, tela, camera_x, poder=None):
-        if poder == poderes.GIGANTE:
-            self._desenhar_gigante(tela, camera_x)
-        else:
-            self._desenhar_normal(tela, camera_x)
+    def desenhar(self, tela, camera_x, poder=None, total=1):
+        # gigante e dragao nao passam por aqui: neles a horda inteira vira um
+        # bicho so, desenhado pelo jogo
+        self._desenhar_normal(tela, camera_x)
         if poder == poderes.BALAO:
-            self._desenhar_balao(tela, camera_x)
+            # horda grande: so parte dos zumbis leva balao, senao vira um borrao
+            passo = 1 if total <= 14 else (2 if total <= 40 else 3)
+            if self.indice % passo == 0:
+                self._desenhar_balao(tela, camera_x)
 
     def _desenhar_normal(self, tela, camera_x):
         # linhas de tras sobem um pouco e escurecem: da profundidade a massa
@@ -225,26 +255,20 @@ class Zumbi(Corpo):
         r.midbottom = (int(self.x - camera_x), int(self.y) - self.linha * cfg.RECUO_LINHA)
         tela.blit(sprite, r)
 
-    def _desenhar_gigante(self, tela, camera_x):
-        sprite = recursos.zumbi_gigante(self.tipo, self.quadro())
-        if sprite is None:
-            self._desenhar_formas(tela, camera_x, 0)
-            return
-        r = sprite.get_rect()
-        r.midbottom = (int(self.x - camera_x),
-                       int(self.y) - self.linha * cfg.RECUO_LINHA)
-        tela.blit(sprite, r)
-
     def _desenhar_balao(self, tela, camera_x):
-        balao = recursos.balao()
-        cima = int(self.y) - self.altura - self.linha * cfg.RECUO_LINHA
-        cx = int(self.x - camera_x)
+        balao = recursos.balao(self.indice)
+        mao = (int(self.x - camera_x) + 4,
+               int(self.y) - self.altura + 6 - self.linha * cfg.RECUO_LINHA)
+        # o balao balanca devagar, cada um no seu tempo
+        vento = math.sin(self.fase * 0.22 + self.indice) * 5
         if balao is None:
-            pygame.draw.circle(tela, poderes.cor(poderes.BALAO), (cx, cima - 18), 9)
+            pygame.draw.circle(tela, poderes.cor(poderes.BALAO),
+                               (mao[0] + vento, mao[1] - 26), 9)
             return
         r = balao.get_rect()
-        r.midbottom = (cx, cima - 4)
-        pygame.draw.line(tela, (30, 26, 32), (cx, cima), (cx, r.bottom), 2)
+        r.midbottom = (mao[0] + vento, mao[1] - cfg.BALAO_FIO)
+        meio = ((mao[0] + r.centerx) // 2 - vento * 0.4, (mao[1] + r.bottom) // 2)
+        pygame.draw.lines(tela, (236, 232, 240), False, (mao, meio, r.midbottom), 1)
         tela.blit(balao, r)
 
     def _desenhar_formas(self, tela, camera_x, linha):
@@ -293,7 +317,7 @@ class Humano(Corpo):
             self.panico = True
 
         if self.panico:
-            self.x += self.velocidade * dt
+            self.andar(self.x + self.velocidade * dt, mundo)
             self.fase += dt * 18
             self.anim += dt * cfg.HUMANO_FPS_ANIM
             self.direcao = 1
@@ -420,7 +444,8 @@ class Moeda:
         cx = int(self.x - camera_x)
         cy = int(self.y + math.sin(self.fase) * 3)
         if self.atraida:
-            pygame.draw.circle(tela, cfg.COR_MOEDA, (cx, cy), cfg.MOEDA_R + 5, 1)
+            # puxada pelo ima: um brilho claro em volta
+            pygame.draw.circle(tela, (255, 244, 190), (cx, cy), cfg.MOEDA_R + 3)
         pygame.draw.ellipse(tela, cfg.COR_MOEDA,
                             (cx - larg, cy - cfg.MOEDA_R, larg * 2, cfg.MOEDA_R * 2))
         pygame.draw.ellipse(tela, (200, 150, 30),

@@ -21,14 +21,20 @@ CAMADAS_FUNDO = ("ceu", "longe", "perto")
 
 # [tipo][linha da formacao][quadro] -> Surface
 _zumbis = []
-# [tipo][quadro] -> Surface, na escala do poder gigante
-_gigantes = []
 # [tipo][quadro] -> Surface
 _humanos = []
+_nomes_zumbi = []   # nome de cada tipo de zumbi, na mesma ordem de _zumbis
+_nomes_humano = []
+_base = []          # tipos que ja nascem zumbis (nao sao um humano mordido)
+_monstros = {}      # nome do monstro da loja -> tipo
+_icones_loja = {}   # nome -> icone da loja
 _icones = {}        # nome do poder -> icone pro HUD e pra tampa da caixa
-_asas = []          # quadros do bater de asas do poder dragao
+_cortes = []        # [tipo][quadro] -> quadro cru, pra escalar sob demanda
+_dragao = []        # quadros crus do dragao em que a horda se transforma
+_baloes = []        # um balao de cada cor
+_ima = None
+_sob_medida = {}    # cache dos sprites escalados sob demanda (gigante, dragao)
 _caixa = None
-_balao = None
 _fundos = {}        # nome do cenario -> (ceu, longe, perto), ou None sem arte
 _tunel = False      # False = ainda nao tentou; depois (fundo, frente) ou None
 _carregado = False
@@ -70,7 +76,10 @@ def _sombrear(surf, fator):
 
 
 def _folhas(prefixo):
-    """Folhas de sprite do disco, em ordem, ja convertidas."""
+    """Pares (nome, folha) do disco, em ordem, ja convertidos.
+
+    O nome e o do arquivo sem o prefixo: `human_noel.png` -> "noel".
+    """
     try:
         nomes = sorted(
             f for f in os.listdir(RAIZ)
@@ -81,7 +90,8 @@ def _folhas(prefixo):
     saida = []
     for nome in nomes:
         try:
-            saida.append(pygame.image.load(os.path.join(RAIZ, nome)).convert_alpha())
+            folha = pygame.image.load(os.path.join(RAIZ, nome)).convert_alpha()
+            saida.append((nome[len(prefixo):-4].lstrip("_"), folha))
         except pygame.error:
             continue
     return saida
@@ -101,7 +111,7 @@ def _avulso(nome, altura):
 
 def carregar():
     """Le as folhas de sprite. Silencioso: sem arte, o jogo cai nas formas."""
-    global _carregado, _caixa, _balao
+    global _carregado, _caixa, _ima
     if _carregado:
         return
     if not pygame.display.get_init() or pygame.display.get_surface() is None:
@@ -109,8 +119,20 @@ def carregar():
         return
     _carregado = True
 
-    for folha in _folhas("zombie"):
+    humanos = _folhas("human")
+    nomes_humanos = {nome for nome, _ in humanos}
+    # a horda junta tres familias: zumbis de nascenca, a versao zumbi de cada
+    # humano (mesmo nome do human_*) e os monstros que a loja libera
+    folhas = [(p, n, f) for p in ("zombie", "monstro") for n, f in _folhas(p)]
+    for prefixo, nome, folha in folhas:
+        tipo = len(_zumbis)
+        _nomes_zumbi.append(nome)
+        if prefixo == "monstro":
+            _monstros[nome] = tipo
+        elif nome not in nomes_humanos:
+            _base.append(tipo)
         cortes = _fatiar(folha)
+        _cortes.append(cortes)
         # uma copia por linha da formacao: menor e mais escura quanto mais
         # atras, que e o que da perspectiva a massa
         por_linha = []
@@ -119,12 +141,19 @@ def carregar():
             fator = 1.0 - linha * cfg.SOMBRA_LINHA
             por_linha.append([_sombrear(_escalar(q, altura), fator) for q in cortes])
         _zumbis.append(por_linha)
-        # versao do poder gigante: so uma escala, sem as linhas da formacao
-        gigante = round(cfg.ZUMBI_SPRITE_A * cfg.GIGANTE_ESCALA)
-        _gigantes.append([_escalar(q, gigante) for q in cortes])
 
-    for folha in _folhas("human"):
+    for nome, folha in humanos:
+        _nomes_humano.append(nome)
         _humanos.append([_escalar(q, cfg.HUMANO_SPRITE_A) for q in _fatiar(folha)])
+
+    try:
+        for arq in sorted(os.listdir(RAIZ)):
+            if arq.startswith("loja_") and arq.endswith(".png"):
+                icone = _avulso(arq, cfg.ICONE_LOJA)
+                if icone is not None:
+                    _icones_loja[arq[5:-4]] = icone
+    except OSError:
+        pass
 
     for nome in poderes.TODOS:
         icone = _avulso(f"poder_{nome}.png", cfg.ICONE_HUD)
@@ -132,17 +161,22 @@ def carregar():
             _icones[nome] = icone
 
     _caixa = _avulso("caixa.png", cfg.CAIXA_SPRITE)
-    _balao = _avulso("poder_balao.png", cfg.BALAO_SPRITE_A)
+    _ima = _avulso("ima.png", cfg.IMA_SPRITE_A)
+    try:
+        folha = pygame.image.load(os.path.join(RAIZ, "baloes.png")).convert_alpha()
+        _baloes.extend(_escalar(q, cfg.BALAO_SPRITE_A) for q in _fatiar(folha))
+        folha = pygame.image.load(os.path.join(RAIZ, "dragao.png")).convert_alpha()
+        _dragao.extend(_fatiar(folha))
+    except (pygame.error, OSError):
+        pass
 
-    asas = _avulso("asas.png", cfg.DRAGAO_ASAS_A)
-    if asas is not None:
-        # o bater de asa e so a mesma arte achatada: pre-escalar aqui evita
-        # um transform.scale por zumbi por quadro no meio do desenho
-        larg, alt = asas.get_size()
-        for i in range(4):
-            f = 1.0 - 0.45 * abs(math.sin(i / 4 * math.pi))
-            _asas.append(pygame.transform.smoothscale(
-                asas, (larg, max(1, round(alt * f)))))
+
+def _medida(chave, quadro, altura):
+    """Quadro escalado pra `altura`, guardado: escalar a cada desenho pesa."""
+    chave = chave + (altura,)
+    if chave not in _sob_medida:
+        _sob_medida[chave] = _escalar(quadro, altura)
+    return _sob_medida[chave]
 
 
 def _camada_fundo(nome, camada):
@@ -214,6 +248,37 @@ def zumbi(tipo, quadro, linha=0):
     return animacao[quadro % len(animacao)]
 
 
+def tipo_inicial():
+    """Tipo do zumbi que comeca a partida."""
+    carregar()
+    return _base[0] if _base else 0
+
+
+def tipos_base():
+    """Tipos que ja nascem zumbis; sem nenhum, vale qualquer um."""
+    carregar()
+    return _base or list(range(len(_zumbis)))
+
+
+def tipo_do_humano(tipo_humano):
+    """Tipo de zumbi em que este humano vira, ou None se nao houver folha."""
+    carregar()
+    if not _nomes_humano:
+        return None
+    nome = _nomes_humano[tipo_humano % len(_nomes_humano)]
+    return _nomes_zumbi.index(nome) if nome in _nomes_zumbi else None
+
+
+def tipo_do_monstro(nome):
+    carregar()
+    return _monstros.get(nome)
+
+
+def icone_loja(nome):
+    carregar()
+    return _icones_loja.get(nome)
+
+
 def total_humanos():
     carregar()
     return len(_humanos)
@@ -227,15 +292,6 @@ def humano(tipo, quadro):
     return animacao[quadro % len(animacao)]
 
 
-def zumbi_gigante(tipo, quadro):
-    """O mesmo zumbi, na escala do poder gigante."""
-    carregar()
-    if not _gigantes:
-        return None
-    animacao = _gigantes[tipo % len(_gigantes)]
-    return animacao[quadro % len(animacao)]
-
-
 def icone(poder):
     carregar()
     return _icones.get(poder)
@@ -246,13 +302,35 @@ def caixa():
     return _caixa
 
 
-def balao():
+def balao(indice):
+    """Balao do zumbi `indice`: a cor roda pela folha."""
     carregar()
-    return _balao
+    return _baloes[indice % len(_baloes)] if _baloes else None
 
 
-def asas(fase):
+def ima():
     carregar()
-    if not _asas:
+    return _ima
+
+
+def gigantao(tipo, quadro, altura):
+    """Um zumbi so, enorme: e nele que a horda vira no poder gigante.
+
+    A altura e arredondada de 8 em 8 px pro cache nao crescer a cada zumbi
+    que entra na horda.
+    """
+    carregar()
+    if not _cortes:
         return None
-    return _asas[int(fase) % len(_asas)]
+    animacao = _cortes[tipo % len(_cortes)]
+    q = quadro % len(animacao)
+    return _medida(("gigante", tipo, q), animacao[q], max(8, round(altura / 8) * 8))
+
+
+def dragao(fase, altura):
+    """Quadro do dragao batendo asa, na altura pedida (de 8 em 8 px)."""
+    carregar()
+    if not _dragao:
+        return None
+    q = int(fase) % len(_dragao)
+    return _medida(("dragao", q), _dragao[q], max(8, round(altura / 8) * 8))
