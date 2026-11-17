@@ -21,6 +21,19 @@ CHAO_Y = 430                # altura do nivel base do chao
 ALTURA_NIVEL = 110          # diferenca entre plataformas
 NIVEIS = 3                  # quantidade de alturas possiveis
 INICIO_SEGURO = 2600        # trecho inicial sem obstaculos
+TETO = 60                   # a horda nunca sobe alem disso, mesmo com poder
+PX_POR_METRO = 50           # escala do placar de distancia
+
+# --- Cenarios de fundo ---
+FUNDO_TROCA_M = 250         # a cada quantos metros tem um tunel e o cenario muda
+TRECHO_CENARIO = FUNDO_TROCA_M * PX_POR_METRO   # o mesmo, em px
+FUNDO_PARALAXE = (0.10, 0.35)   # quanto as camadas longe/perto acompanham a camera
+
+# --- Tunel entre dois cenarios ---
+TUNEL_LARGURA = 720         # largura do vao (igual a da arte em assets/fundos)
+TUNEL_TETO = 215            # y do teto do vao: cabe o pulo normal inteiro
+TUNEL_RAMPA = 260           # distancia em que o teto desce ate a boca do tunel
+TUNEL_MARGEM = 320          # chao reto e sem carro antes e depois do tunel
 
 # --- Horda ---
 X_LIDER = 260               # posicao do lider na tela
@@ -37,6 +50,37 @@ QUADRO_CAINDO = 0           # pernas abertas, pronto pra pousar
 SOMBRA_LINHA = 0.06         # quanto cada linha de tras escurece
 ESCALA_LINHA = 0.05         # quanto cada linha de tras encolhe
 RECUO_LINHA = 9             # quanto cada linha de tras sobe na tela
+
+# --- Sprites dos humanos ---
+HUMANO_SPRITE_A = 44        # altura desenhada (o hitbox continua HUMANO_A)
+HUMANO_FPS_ANIM = 13        # ciclo de corrida
+HUMANO_FPS_PASSEIO = 6      # antes do panico o humano so caminha
+
+# --- Caixas de poder ---
+CAIXA_SPRITE = 58           # tamanho desenhado do caixote
+CAIXA_DISTANCIA = 5000      # px entre uma caixa e a proxima (100 m)
+CAIXA_MARGEM = 90           # distancia minima da borda da plataforma
+CAIXA_FOLGA = 130           # distancia minima de um obstaculo
+CAIXA_FLUTUA = 6            # amplitude do sobe-e-desce
+CAIXA_PRIMEIRA_X = 900      # a primeira caixa vem cedo, pra ensinar o poder
+
+# --- Poderes ---
+ICONE_HUD = 34              # tamanho do icone do poder no HUD
+GIGANTE_ESCALA = 1.75       # quanto o zumbi cresce
+GIGANTE_ALCANCE = 20        # folga extra do hitbox enquanto gigante
+DRAGAO_SUBIDA = -300.0      # px/s segurando o pulo
+DRAGAO_DESCIDA = 180.0      # px/s soltando
+DRAGAO_TETO = 110           # altura maxima do voo
+DRAGAO_ASAS_A = 150         # altura da arte das asas em cache
+DRAGAO_ASAS_FOLGA = 140     # quanto as asas passam da largura da horda
+DRAGAO_FPS_ASAS = 9
+BALAO_GRAVIDADE = 0.55      # multiplicador da gravidade
+BALAO_PULO = 0.72           # pulo mais fraco: com a queda lenta ele ja sobe muito
+BALAO_PULOS_EXTRA = 1       # pulos disponiveis no ar
+BALAO_SPRITE_A = 30         # balao desenhado acima do zumbi
+IMA_RAIO = 320.0            # de quao longe a moeda e puxada
+IMA_VELOCIDADE = 8.0        # quao rapido ela chega
+IMA_MULTIPLICADOR = 2       # moeda vale em dobro
 
 # --- Entidades ---
 HUMANO_L = 24
@@ -71,3 +115,5 @@ COR_MOEDA = (250, 200, 60)
 COR_TEXTO = (245, 245, 245)
 COR_SOMBRA = (0, 0, 0)
 COR_CAIXA = (211, 175, 55)
+COR_BARRA_PODER = (250, 226, 120)
+COR_FOGO = (250, 176, 60)
