@@ -5,7 +5,7 @@ import random
 import pygame
 
 from jogo import config as cfg
-from jogo.entidades import Humano, Moeda, Obstaculo
+from jogo.entidades import Box, Humano, Moeda, Obstaculo
 
 TEMPO_NO_AR = 2 * abs(cfg.VEL_PULO) / cfg.GRAVIDADE
 
@@ -33,10 +33,18 @@ class Mundo:
         self.obstaculos = []
         self.humanos = []
         self.moedas = []
+        self.caixas = []
         self.predios = []
         base = Segmento(-400, 1600, cfg.CHAO_Y, 0)
         self.segmentos.append(base)
         self._gerar_predios(-400, 2000)
+        # a primeira caixa vem antes de qualquer obstaculo: o jogador aprende
+        # o que ela faz sem o risco de perder zumbi no meio
+        self.caixas.append(Box(cfg.CAIXA_PRIMEIRA_X, cfg.CHAO_Y - 8))
+        # dai em diante as caixas seguem uma grade fixa de distancia
+        self.proxima_caixa = cfg.CAIXA_PRIMEIRA_X + cfg.CAIXA_DISTANCIA
+        # centro do proximo tunel: um a cada troca de cenario
+        self.proximo_tunel = cfg.TRECHO_CENARIO
 
     # ------------------------------------------------------------------ chao
     def chao_em(self, x):
@@ -45,6 +53,23 @@ class Mundo:
             if seg.contem(x):
                 return seg.topo
         return None
+
+    def teto_em(self, x):
+        """Ate onde a horda pode subir no ponto x.
+
+        Dentro do tunel o limite e o teto do vao. Chegando perto ele desce
+        em rampa, pra quem vem voando mergulhar na boca do tunel em vez de
+        atravessar a rocha.
+        """
+        k = round(x / cfg.TRECHO_CENARIO)
+        if k < 1:
+            return cfg.TETO
+        fora = abs(x - k * cfg.TRECHO_CENARIO) - cfg.TUNEL_LARGURA / 2
+        if fora <= 0:
+            return cfg.TUNEL_TETO
+        if fora >= cfg.TUNEL_RAMPA:
+            return cfg.TETO
+        return cfg.TUNEL_TETO + (cfg.TETO - cfg.TUNEL_TETO) * fora / cfg.TUNEL_RAMPA
 
     # -------------------------------------------------------------- geracao
     def atualizar(self, dt, camera_x, velocidade, lider_x):
@@ -62,13 +87,17 @@ class Mundo:
             h.atualizar(dt, self, lider_x)
         for m in self.moedas:
             m.atualizar(dt)
+        for c in self.caixas:
+            c.atualizar(dt)
         self.humanos = [h for h in self.humanos if h.vivo]
+        self.caixas = [c for c in self.caixas if c.vivo]
 
     def _limpar(self, minimo):
         self.segmentos = [s for s in self.segmentos if s.fim > minimo]
         self.obstaculos = [o for o in self.obstaculos if o.vivo and o.x > minimo]
         self.humanos = [h for h in self.humanos if h.x > minimo - 200]
         self.moedas = [m for m in self.moedas if m.vivo and m.x > minimo]
+        self.caixas = [c for c in self.caixas if c.vivo and c.x > minimo]
         self.predios = [p for p in self.predios if p[0] + p[2] > minimo - 1200]
 
     def _gerar_segmento(self, velocidade):
@@ -90,6 +119,14 @@ class Mundo:
             buraco = 0.0
 
         largura = random.uniform(1.6, 3.0) * alcance
+        # chegando no tunel: tenta a menor plataforma possivel e, se nem ela
+        # couber, emenda direto no chao reto que atravessa o tunel
+        entrada = self.proximo_tunel - cfg.TUNEL_LARGURA / 2 - cfg.TUNEL_MARGEM
+        if anterior.fim + buraco + largura > entrada:
+            largura = 1.6 * alcance
+            if anterior.fim + buraco + largura > entrada:
+                self._gerar_chao_do_tunel(anterior, alcance, entrada)
+                return
         topo = cfg.CHAO_Y - nivel * cfg.ALTURA_NIVEL
         seg = Segmento(anterior.fim + buraco, largura, topo, nivel)
         self.segmentos.append(seg)
@@ -97,6 +134,21 @@ class Mundo:
         if buraco > 40 and random.random() < 0.6:
             self._arco_de_moedas(anterior.fim, seg.x, min(anterior.topo, topo))
         self._povoar(seg, alcance)
+
+    def _gerar_chao_do_tunel(self, anterior, alcance, entrada):
+        """Plataforma unica, no nivel base e sem carro, que atravessa o tunel."""
+        buraco = random.uniform(0.25, 0.45) * alcance if anterior.nivel else 0.0
+        x = min(anterior.fim + buraco, entrada)
+        fim = self.proximo_tunel + cfg.TUNEL_LARGURA / 2 + cfg.TUNEL_MARGEM
+        seg = Segmento(x, fim - x, cfg.CHAO_Y, 0)
+        self.segmentos.append(seg)
+        for _ in range(random.randint(1, 3)):
+            self.humanos.append(Humano(random.uniform(seg.x + 60, seg.fim - 40), seg.topo))
+        # fileira de moedas guiando a horda por dentro do tunel
+        for i in range(-5, 6):
+            self.moedas.append(Moeda(self.proximo_tunel + i * 44, seg.topo - 60))
+        self._caixas_do_trecho(seg)
+        self.proximo_tunel += cfg.TRECHO_CENARIO
 
     def _povoar(self, seg, alcance):
         # margens livres: zona de pouso no inicio e espaco pro pulo no fim,
@@ -116,11 +168,35 @@ class Mundo:
         for _ in range(quantidade):
             x = random.uniform(seg.x + 60, seg.fim - 40)
             self.humanos.append(Humano(x, seg.topo))
+        self._caixas_do_trecho(seg)
         # moedas sobre a plataforma
         if random.random() < 0.5:
             x = random.uniform(seg.x + 80, max(seg.x + 90, seg.fim - 160))
             for i in range(random.randint(3, 6)):
                 self.moedas.append(Moeda(x + i * 34, seg.topo - 60))
+
+    def _caixas_do_trecho(self, seg):
+        """Caixas numa grade fixa: uma a cada `CAIXA_DISTANCIA` px de corrida.
+
+        Se o ponto da grade cai num buraco ou na borda, a caixa vai pro
+        comeco desta plataforma; se cai em cima de um carro, anda pra frente
+        ate ter folga. A grade em si nao se move: o desvio de uma caixa nao
+        empurra as seguintes.
+        """
+        ini, fim = seg.x + cfg.CAIXA_MARGEM, seg.fim - cfg.CAIXA_MARGEM
+        while self.proxima_caixa <= fim:
+            x = self._vaga_livre(max(self.proxima_caixa, ini), fim)
+            if x is None:
+                return              # plataforma lotada: a caixa fica pra proxima
+            self.caixas.append(Box(x, seg.topo - 8))
+            self.proxima_caixa += cfg.CAIXA_DISTANCIA
+
+    def _vaga_livre(self, x, fim):
+        """Primeiro x a partir do pedido que fica longe de todo obstaculo."""
+        for o in sorted(self.obstaculos, key=lambda o: o.x):
+            if abs(x - o.x) < cfg.CAIXA_FOLGA:
+                x = o.x + cfg.CAIXA_FOLGA
+        return x if x <= fim else None
 
     def _arco_de_moedas(self, x_ini, x_fim, topo):
         n = 6
@@ -143,6 +219,7 @@ class Mundo:
 
     # -------------------------------------------------------------- desenho
     def desenhar_fundo(self, tela, camera_x):
+        """Fundo de reserva, desenhado com formas: so entra sem assets/fundos."""
         for i in range(cfg.ALTURA):
             t = i / cfg.ALTURA
             cor = [int(a + (b - a) * t) for a, b in zip(cfg.COR_CEU_TOPO, cfg.COR_CEU_BASE)]
@@ -161,31 +238,54 @@ class Mundo:
                     if (jx + jy) % 3:
                         pygame.draw.rect(tela, cfg.COR_JANELA, (jx, jy, 7, 10))
 
-    def desenhar(self, tela, camera_x):
+    @staticmethod
+    def _pedacos(x_ini, x_fim):
+        """Corta o intervalo nas bocas dos tuneis: cada pedaco tem uma paleta so."""
+        meio = cfg.TUNEL_LARGURA / 2
+        k = max(1, round(x_ini / cfg.TRECHO_CENARIO))
+        while k * cfg.TRECHO_CENARIO - meio < x_fim:
+            for corte in (k * cfg.TRECHO_CENARIO - meio, k * cfg.TRECHO_CENARIO + meio):
+                if x_ini < corte < x_fim:
+                    yield x_ini, corte
+                    x_ini = corte
+            k += 1
+        yield x_ini, x_fim
+
+    def desenhar(self, tela, camera_x, paleta_em):
+        """`paleta_em(x)` devolve as cores do chao do cenario no ponto x do mundo."""
         # o vao abaixo do nivel base vira abismo, pra leitura dos buracos
-        pygame.draw.rect(tela, cfg.COR_ABISMO,
-                         (0, cfg.CHAO_Y, cfg.LARGURA, cfg.ALTURA - cfg.CHAO_Y))
+        for a, b in self._pedacos(camera_x, camera_x + cfg.LARGURA):
+            pygame.draw.rect(tela, paleta_em((a + b) / 2)["abismo"],
+                             (int(a - camera_x), cfg.CHAO_Y,
+                              int(b - camera_x) - int(a - camera_x), cfg.ALTURA - cfg.CHAO_Y))
         # cada buraco vira uma coluna escura bem visivel
         for a, b in zip(self.segmentos, self.segmentos[1:]):
             if b.x > a.fim + 1:
                 topo = min(a.topo, b.topo)
-                pygame.draw.rect(tela, cfg.COR_ABISMO,
+                pygame.draw.rect(tela, paleta_em((a.fim + b.x) / 2)["abismo"],
                                  (int(a.fim - camera_x), int(topo),
                                   int(b.x - a.fim), cfg.ALTURA - int(topo)))
         for seg in self.segmentos:
-            r = pygame.Rect(int(seg.x - camera_x), int(seg.topo),
-                            int(seg.largura), cfg.ALTURA - int(seg.topo))
-            pygame.draw.rect(tela, cfg.COR_CHAO, r)
-            pygame.draw.rect(tela, cfg.COR_CHAO_LADO, (r.x, r.y, 4, r.height))
-            pygame.draw.rect(tela, cfg.COR_CHAO_LADO, (r.right - 4, r.y, 4, r.height))
-            pygame.draw.rect(tela, cfg.COR_CHAO_TOPO, (r.x, r.y, r.width, 9))
-            # riscos de asfalto pra dar sensacao de velocidade
-            for x in range(r.x - (int(camera_x) % 60), r.right, 60):
-                if r.x < x < r.right - 8:
-                    pygame.draw.rect(tela, cfg.COR_CHAO_LADO, (x, r.y + 26, 26, 4))
+            topo = int(seg.topo)
+            alt = cfg.ALTURA - topo
+            for a, b in self._pedacos(seg.x, seg.fim):
+                cores = paleta_em((a + b) / 2)
+                r = pygame.Rect(int(a - camera_x), topo,
+                                int(b - camera_x) - int(a - camera_x), alt)
+                pygame.draw.rect(tela, cores["chao"], r)
+                pygame.draw.rect(tela, cores["topo"], (r.x, r.y, r.width, 9))
+                # riscos de asfalto pra dar sensacao de velocidade
+                for x in range(r.x - (int(camera_x) % 60), r.right, 60):
+                    if r.x < x < r.right - 8:
+                        pygame.draw.rect(tela, cores["lado"], (x, r.y + 26, 26, 4))
+            esq, dire = int(seg.x - camera_x), int(seg.fim - camera_x)
+            pygame.draw.rect(tela, paleta_em(seg.x)["lado"], (esq, topo, 4, alt))
+            pygame.draw.rect(tela, paleta_em(seg.fim)["lado"], (dire - 4, topo, 4, alt))
         for m in self.moedas:
             m.desenhar(tela, camera_x)
         for o in self.obstaculos:
             o.desenhar(tela, camera_x)
+        for c in self.caixas:
+            c.desenhar(tela, camera_x)
         for h in self.humanos:
             h.desenhar(tela, camera_x)
