@@ -54,6 +54,18 @@ class Mundo:
                 return seg.topo
         return None
 
+    def parede_em(self, x, y):
+        """Parede que barra quem esta com o pe em y e a frente em x.
+
+        Devolve o x da face esquerda da plataforma, ou None se o caminho
+        esta livre. So e parede pra quem ja esta abaixo da beirada: quem
+        chega quase na altura dela ainda sobe (mesma folga do pouso).
+        """
+        for seg in self.segmentos:
+            if seg.contem(x):
+                return seg.x if y > seg.topo + cfg.FOLGA_BEIRADA else None
+        return None
+
     def teto_em(self, x):
         """Ate onde a horda pode subir no ponto x.
 
@@ -238,6 +250,32 @@ class Mundo:
                     if (jx + jy) % 3:
                         pygame.draw.rect(tela, cfg.COR_JANELA, (jx, jy, 7, 10))
 
+    _sombras = {}       # (topo do vao) -> gradientes prontos, feitos uma vez
+
+    @classmethod
+    def _sombra_do_buraco(cls, tela, esq, dire, topo):
+        """Sombra do vao entre duas plataformas, de `topo` ate o pe da tela."""
+        if dire <= 0 or esq >= cfg.LARGURA or dire <= esq:
+            return
+        if topo not in cls._sombras:
+            alt = cfg.ALTURA - topo
+            fundo = pygame.Surface((cfg.LARGURA, alt), pygame.SRCALPHA)
+            for y in range(alt):
+                forca = int(cfg.BURACO_SOMBRA * (y / alt) ** 0.8)
+                pygame.draw.line(fundo, (8, 6, 14, forca), (0, y), (cfg.LARGURA, y))
+            lado = pygame.Surface((cfg.BURACO_SOMBRA_LADO, alt), pygame.SRCALPHA)
+            for x in range(cfg.BURACO_SOMBRA_LADO):
+                forca = int(70 * (1 - x / cfg.BURACO_SOMBRA_LADO) ** 2)
+                pygame.draw.line(lado, (8, 6, 14, forca), (x, 0), (x, alt))
+            cls._sombras[topo] = (fundo, lado, pygame.transform.flip(lado, True, False))
+        fundo, lado_esq, lado_dir = cls._sombras[topo]
+        larg = dire - esq
+        tela.blit(fundo, (esq, topo), (0, 0, larg, fundo.get_height()))
+        faixa = min(cfg.BURACO_SOMBRA_LADO, larg // 2)
+        tela.blit(lado_esq, (esq, topo), (0, 0, faixa, fundo.get_height()))
+        tela.blit(lado_dir, (dire - faixa, topo),
+                  (cfg.BURACO_SOMBRA_LADO - faixa, 0, faixa, fundo.get_height()))
+
     @staticmethod
     def _pedacos(x_ini, x_fim):
         """Corta o intervalo nas bocas dos tuneis: cada pedaco tem uma paleta so."""
@@ -253,18 +291,12 @@ class Mundo:
 
     def desenhar(self, tela, camera_x, paleta_em):
         """`paleta_em(x)` devolve as cores do chao do cenario no ponto x do mundo."""
-        # o vao abaixo do nivel base vira abismo, pra leitura dos buracos
-        for a, b in self._pedacos(camera_x, camera_x + cfg.LARGURA):
-            pygame.draw.rect(tela, paleta_em((a + b) / 2)["abismo"],
-                             (int(a - camera_x), cfg.CHAO_Y,
-                              int(b - camera_x) - int(a - camera_x), cfg.ALTURA - cfg.CHAO_Y))
-        # cada buraco vira uma coluna escura bem visivel
+        # o buraco e so um vao: o fundo aparece por ele, com uma sombra leve
+        # que escurece pra baixo e junto das duas paredes
         for a, b in zip(self.segmentos, self.segmentos[1:]):
             if b.x > a.fim + 1:
-                topo = min(a.topo, b.topo)
-                pygame.draw.rect(tela, paleta_em((a.fim + b.x) / 2)["abismo"],
-                                 (int(a.fim - camera_x), int(topo),
-                                  int(b.x - a.fim), cfg.ALTURA - int(topo)))
+                self._sombra_do_buraco(tela, int(a.fim - camera_x), int(b.x - camera_x),
+                                       int(max(a.topo, b.topo)))
         for seg in self.segmentos:
             topo = int(seg.topo)
             alt = cfg.ALTURA - topo
