@@ -308,6 +308,7 @@ class Humano(Corpo):
         self.velocidade = cfg.VEL_HUMANO * random.uniform(0.9, 1.1)
         self.direcao = random.choice((-1, 1))
         self.panico = False
+        self.gritou = False         # o grito sai uma vez so, quando ve a horda
         tipos = recursos.total_humanos()
         self.tipo = random.randrange(tipos) if tipos else 0
         self.anim = random.uniform(0, 5)

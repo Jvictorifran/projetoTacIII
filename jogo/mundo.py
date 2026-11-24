@@ -1,13 +1,47 @@
-"""Geracao procedural do cenario: plataformas, buracos, obstaculos e itens."""
+"""O mundo da corrida: plataformas, buracos, obstaculos e itens.
 
+Quem cria o terreno e um *gerador* (padrao Strategy): o `GeradorProcedural`
+inventa o caminho na hora, com as regras de balanceamento abaixo, e o
+`GeradorDeFase` (em `jogo/fase.py`) monta o caminho de uma fase feita no
+editor. O resto do jogo so conversa com o `Mundo` por `chao_em`, `parede_em`
+e `teto_em`, sem saber de onde o chao veio.
+"""
+
+import math
 import random
 
 import pygame
 
 from jogo import config as cfg
+from jogo import poderes
 from jogo.entidades import Box, Humano, Moeda, Obstaculo
 
 TEMPO_NO_AR = 2 * abs(cfg.VEL_PULO) / cfg.GRAVIDADE
+
+
+def velocidade_em(x):
+    """Velocidade da horda quando a camera passa por x, no modo infinito.
+
+    A velocidade sobe em linha reta com o tempo (`ACELERACAO`), entao a
+    distancia e uma parabola e da pra inverter. Usar isso em vez da
+    velocidade do quadro deixa o terreno igual pra mesma semente - e o que
+    faz o desafio da sala ser o mesmo mapa pra todo mundo.
+    """
+    v = math.sqrt(cfg.VEL_INICIAL ** 2 + 2 * cfg.ACELERACAO * max(0.0, x))
+    return min(cfg.VEL_MAXIMA, v)
+
+
+class GeradorProcedural:
+    """Strategy do modo infinito: gera trecho novo sempre que falta chao."""
+
+    def preparar(self, mundo):
+        mundo.caixas.append(Box(cfg.CAIXA_PRIMEIRA_X, cfg.CHAO_Y - 8,
+                                mundo.rng.choice(poderes.TODOS)))
+
+    def estender(self, mundo, limite):
+        while mundo.segmentos[-1].fim < limite:
+            fim = mundo.segmentos[-1].fim
+            mundo._gerar_segmento(velocidade_em(fim - cfg.LARGURA * 2))
 
 
 class Segmento:
@@ -28,7 +62,11 @@ class Segmento:
 
 
 class Mundo:
-    def __init__(self):
+    def __init__(self, gerador=None, seed=None):
+        # sorteios do terreno numa fonte so dele: com a mesma semente o mapa
+        # sai igual, por mais que particulas e humanos sorteiem no meio
+        self.rng = random.Random(seed)
+        self.gerador = gerador or GeradorProcedural()
         self.segmentos = []
         self.obstaculos = []
         self.humanos = []
@@ -38,13 +76,13 @@ class Mundo:
         base = Segmento(-400, 1600, cfg.CHAO_Y, 0)
         self.segmentos.append(base)
         self._gerar_predios(-400, 2000)
-        # a primeira caixa vem antes de qualquer obstaculo: o jogador aprende
-        # o que ela faz sem o risco de perder zumbi no meio
-        self.caixas.append(Box(cfg.CAIXA_PRIMEIRA_X, cfg.CHAO_Y - 8))
         # dai em diante as caixas seguem uma grade fixa de distancia
         self.proxima_caixa = cfg.CAIXA_PRIMEIRA_X + cfg.CAIXA_DISTANCIA
         # centro do proximo tunel: um a cada troca de cenario
         self.proximo_tunel = cfg.TRECHO_CENARIO
+        # a primeira caixa vem antes de qualquer obstaculo: o jogador aprende
+        # o que ela faz sem o risco de perder zumbi no meio
+        self.gerador.preparar(self)
 
     # ------------------------------------------------------------------ chao
     def chao_em(self, x):
@@ -86,8 +124,7 @@ class Mundo:
     # -------------------------------------------------------------- geracao
     def atualizar(self, dt, camera_x, velocidade, lider_x):
         limite = camera_x + cfg.LARGURA * 2
-        while self.segmentos[-1].fim < limite:
-            self._gerar_segmento(velocidade)
+        self.gerador.estender(self, limite)
         if self.predios and self.predios[-1][0] < limite:
             self._gerar_predios(self.predios[-1][0], limite + 600)
 
@@ -117,20 +154,20 @@ class Mundo:
         alcance = velocidade * TEMPO_NO_AR
 
         nivel = anterior.nivel
-        if random.random() < 0.35:
-            nivel = max(0, min(cfg.NIVEIS - 1, nivel + random.choice((-1, 1))))
+        if self.rng.random() < 0.35:
+            nivel = max(0, min(cfg.NIVEIS - 1, nivel + self.rng.choice((-1, 1))))
 
         if nivel > anterior.nivel:
             # subida: buraco curto, senao vira pulo de precisao impossivel
-            buraco = random.uniform(0.10, 0.22) * alcance
+            buraco = self.rng.uniform(0.10, 0.22) * alcance
         elif nivel < anterior.nivel:
-            buraco = random.uniform(0.25, 0.45) * alcance
-        elif random.random() < 0.55:
-            buraco = random.uniform(0.30, 0.55) * alcance
+            buraco = self.rng.uniform(0.25, 0.45) * alcance
+        elif self.rng.random() < 0.55:
+            buraco = self.rng.uniform(0.30, 0.55) * alcance
         else:
             buraco = 0.0
 
-        largura = random.uniform(1.6, 3.0) * alcance
+        largura = self.rng.uniform(1.6, 3.0) * alcance
         # chegando no tunel: tenta a menor plataforma possivel e, se nem ela
         # couber, emenda direto no chao reto que atravessa o tunel
         entrada = self.proximo_tunel - cfg.TUNEL_LARGURA / 2 - cfg.TUNEL_MARGEM
@@ -143,19 +180,19 @@ class Mundo:
         seg = Segmento(anterior.fim + buraco, largura, topo, nivel)
         self.segmentos.append(seg)
 
-        if buraco > 40 and random.random() < 0.6:
+        if buraco > 40 and self.rng.random() < 0.6:
             self._arco_de_moedas(anterior.fim, seg.x, min(anterior.topo, topo))
         self._povoar(seg, alcance)
 
     def _gerar_chao_do_tunel(self, anterior, alcance, entrada):
         """Plataforma unica, no nivel base e sem carro, que atravessa o tunel."""
-        buraco = random.uniform(0.25, 0.45) * alcance if anterior.nivel else 0.0
+        buraco = self.rng.uniform(0.25, 0.45) * alcance if anterior.nivel else 0.0
         x = min(anterior.fim + buraco, entrada)
         fim = self.proximo_tunel + cfg.TUNEL_LARGURA / 2 + cfg.TUNEL_MARGEM
         seg = Segmento(x, fim - x, cfg.CHAO_Y, 0)
         self.segmentos.append(seg)
-        for _ in range(random.randint(1, 3)):
-            self.humanos.append(Humano(random.uniform(seg.x + 60, seg.fim - 40), seg.topo))
+        for _ in range(self.rng.randint(1, 3)):
+            self.humanos.append(Humano(self.rng.uniform(seg.x + 60, seg.fim - 40), seg.topo))
         # fileira de moedas guiando a horda por dentro do tunel
         for i in range(-5, 6):
             self.moedas.append(Moeda(self.proximo_tunel + i * 44, seg.topo - 60))
@@ -169,22 +206,22 @@ class Mundo:
         fim = seg.fim - 1.15 * alcance   # da pra pular o obstaculo e ainda pousar
         if seg.x > cfg.INICIO_SEGURO and fim > ini:
             ultimo_x = ini - 200
-            for _ in range(random.choice((0, 1, 1, 2, 2, 3))):
-                x = random.uniform(max(ini, ultimo_x + 170), fim)
+            for _ in range(self.rng.choice((0, 1, 1, 2, 2, 3))):
+                x = self.rng.uniform(max(ini, ultimo_x + 170), fim)
                 if x <= ultimo_x + 160:
                     break
-                self.obstaculos.append(Obstaculo(x, seg.topo, random.randint(1, 4)))
+                self.obstaculos.append(Obstaculo(x, seg.topo, self.rng.randint(1, 4)))
                 ultimo_x = x
         # humanos fugindo (mais gente no comeco pra horda crescer rapido)
-        quantidade = random.randint(2, 4) if seg.x < cfg.INICIO_SEGURO else random.choice((0, 1, 1, 2, 3))
+        quantidade = self.rng.randint(2, 4) if seg.x < cfg.INICIO_SEGURO else self.rng.choice((0, 1, 1, 2, 3))
         for _ in range(quantidade):
-            x = random.uniform(seg.x + 60, seg.fim - 40)
+            x = self.rng.uniform(seg.x + 60, seg.fim - 40)
             self.humanos.append(Humano(x, seg.topo))
         self._caixas_do_trecho(seg)
         # moedas sobre a plataforma
-        if random.random() < 0.5:
-            x = random.uniform(seg.x + 80, max(seg.x + 90, seg.fim - 160))
-            for i in range(random.randint(3, 6)):
+        if self.rng.random() < 0.5:
+            x = self.rng.uniform(seg.x + 80, max(seg.x + 90, seg.fim - 160))
+            for i in range(self.rng.randint(3, 6)):
                 self.moedas.append(Moeda(x + i * 34, seg.topo - 60))
 
     def _caixas_do_trecho(self, seg):
@@ -200,7 +237,7 @@ class Mundo:
             x = self._vaga_livre(max(self.proxima_caixa, ini), fim)
             if x is None:
                 return              # plataforma lotada: a caixa fica pra proxima
-            self.caixas.append(Box(x, seg.topo - 8))
+            self.caixas.append(Box(x, seg.topo - 8, self.rng.choice(poderes.TODOS)))
             self.proxima_caixa += cfg.CAIXA_DISTANCIA
 
     def _vaga_livre(self, x, fim):
@@ -221,6 +258,7 @@ class Mundo:
 
     # ------------------------------------------------------------- cenario
     def _gerar_predios(self, x_ini, x_fim):
+        # predio de fundo e enfeite: sorteia no random global, fora da semente
         x = x_ini
         while x < x_fim:
             larg = random.randint(60, 130)

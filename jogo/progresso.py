@@ -1,7 +1,8 @@
 """O que fica guardado entre uma abertura do jogo e outra.
 
 Um JSON so, `progresso.json`, na raiz do projeto: moedas no cofre, o que foi
-comprado na loja, o recorde e a opcao de som. Arquivo ausente ou estragado
+comprado na loja, o recorde e as configuracoes (som, volume, tela cheia e nome
+do jogador no placar da LAN, musica). Arquivo ausente ou estragado
 vira progresso zerado, sem derrubar o jogo.
 """
 
@@ -12,7 +13,8 @@ CAMINHO = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "progresso.json"
 )
 
-PADRAO = {"moedas": 0, "recorde": 0, "som": True, "itens": {}}
+PADRAO = {"moedas": 0, "recorde": 0, "som": True, "itens": {},
+          "volume": 80, "musica": True, "tela_cheia": False, "nome": "Jogador"}
 
 dados = dict(PADRAO, itens={})
 
@@ -32,6 +34,14 @@ def carregar():
     dados["itens"] = {str(k): int(v) for k, v in dados["itens"].items()
                       if isinstance(v, int) and v > 0}
     dados["moedas"] = max(0, dados["moedas"])
+    dados["volume"] = max(0, min(100, dados["volume"]))
+    dados["nome"] = dados["nome"].strip()[:16] or PADRAO["nome"]
+
+
+def zerar():
+    """Apaga moedas, compras e recorde. Som, volume, tela e nome ficam."""
+    dados["moedas"], dados["recorde"], dados["itens"] = 0, 0, {}
+    salvar()
 
 
 def salvar():

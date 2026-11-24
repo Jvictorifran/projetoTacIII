@@ -2,3 +2,4 @@ venv/
 __pycache__/
 *.pyc
 progresso.json
+placar_lan.json

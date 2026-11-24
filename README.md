@@ -18,15 +18,24 @@ python3 -m venv venv
 | `ESPACO` / `W` / `seta cima` / clique | pular (a horda inteira pula junto) |
 | soltar a tecla cedo | pulo mais baixo |
 | `M` | liga/desliga os efeitos sonoros |
-| `ESC` | durante a partida volta pra tela inicial; nela, sai do jogo |
+| `ESC` | pausa (continuar, reiniciar ou voltar) |
 
-Na tela inicial: setas (ou o mouse) escolhem entre **Jogar**, **Loja**,
-**Efeitos sonoros** e **Sair**; `ENTER`, `ESPACO` ou clique confirmam. Na
-loja e igual, e `ESC` volta.
+## Menus
 
-Quando a horda acaba, o placar final fica 3 s na tela (`FIM_ESPERA`) e o jogo
-volta sozinho pra tela inicial, que mostra o resultado da ultima partida.
-Qualquer tecla de pulo adianta a volta.
+A tela inicial tem **Novo jogo** (modo infinito), **Fases** (as fases salvas),
+**Editor de fases**, **Multiplayer (placar LAN)**, **Loja**, **Configuracoes**
+e **Sair**. Em todas as telas: setas (ou o mouse) escolhem, setas pros lados
+mudam valores, `ENTER`/`ESPACO`/clique confirmam e `ESC` volta.
+
+- **Configuracoes**: efeitos sonoros, musica tema, volume, tela cheia, nome no placar da
+  LAN e zerar progresso (pede confirmacao). Tudo fica em `progresso.json`.
+- **Pausa** (`ESC` na partida): continuar, reiniciar ou voltar pra onde a
+  partida foi aberta (menu, fases, editor ou sala).
+- **Fim de partida**: o placar fica 3 s (`FIM_ESPERA`) e o jogo volta pra
+  origem; qualquer tecla de pulo adianta.
+
+O GDD completo (menus, editor, multiplayer, padroes de projeto e diagramas)
+esta em [docs/GDD.md](docs/GDD.md).
 
 ## Mecanicas implementadas
 
@@ -53,19 +62,19 @@ Qualquer tecla de pulo adianta a volta.
   (`BURACO_SOMBRA`). Quem cai nele da de cara na parede da plataforma
   seguinte e escorrega por ela, em vez de atravessar o chao; quem chega ate
   24 px abaixo da beirada (`FOLGA_BEIRADA`) ainda sobe nela.
-- **Tela inicial**: jogar, loja, ligar/desligar os efeitos sonoros e sair.
 - **Loja**: as moedas de cada partida vao pro cofre e compram melhorias
   (veja abaixo). Cofre, compras, recorde e opcao de som ficam em
   `progresso.json` (fora do git).
-- **Efeitos sonoros**: pulo, moeda, mordida (humano convertido), batida no
-  carro, baque na parede do buraco, explosao, poder e fim de jogo.
+- **Sons e musica**: musica tema em loop, passos da horda, mordida, gemidos,
+  gritos dos humanos, batida e carro quebrando, explosao, poder e fim - tudo CC0
+  da web.
 - **Humanos**: passeiam devagar e so entram em panico quando a horda chega
   perto; fogem correndo e tentam pular os buracos.
 - **Moedas**: espalhadas nas plataformas e em arcos por cima dos buracos.
 - **Dificuldade**: a velocidade sobe com o tempo (330 -> 700 px/s) e as
   plataformas escalam junto.
 - **Pulo com sensacao boa**: coyote time, buffer de entrada e pulo variavel.
-- **Pontuacao**: metros + moedas x5, com recorde da sessao.
+- **Pontuacao**: metros + moedas x5 (numa fase, +10 por zumbi que cruza a chegada); o recorde do modo infinito fica salvo.
 
 ## Loja
 
@@ -81,6 +90,49 @@ Qualquer tecla de pulo adianta a volta.
 Com monstros liberados, cada mordido tem 40% de chance (`MONSTRO_CHANCE`) de
 virar um deles em vez da versao zumbi de si mesmo. O catalogo fica em `ITENS`,
 em `jogo/loja.py`; pra zerar o progresso, apague `progresso.json`.
+
+## Editor de fases
+
+Menu **Editor de fases** -> **+ Criar fase nova** (ou uma fase salva). A fase
+e uma grade de colunas de 40 px: cada coluna e chao num dos 3 niveis ou
+buraco, e pode ter um objeto em cima (carro, humano, moeda ou caixa). A previa
+e o proprio jogo desenhado, com a grade, as guias dos niveis, o arco do pulo
+na coluna do mouse e a chegada.
+
+| Entrada | Acao |
+|---------|------|
+| `1`-`7` ou clique na paleta | chao, buraco, carro, humano, moeda, caixa, apagar |
+| clique / arrastar | poe a peca / pinta (a altura do mouse escolhe o nivel do chao) |
+| clicar de novo no carro / caixa | muda a vida (1-4) / o poder |
+| botao direito | apaga (em buraco, tapa com chao) |
+| setas, `A`/`D`, roda, `Home`/`End` | rola (`SHIFT` acelera) |
+| `N` / `V` / `C` / `+` `-` | nome, velocidade, cenario inicial, tamanho |
+| `Ctrl+Z` / `Ctrl+Y` | desfazer / refazer |
+| `Ctrl+S` / `F5` | salvar em `fases/<nome>.json` / testar |
+
+A largada e o trecho do tunel (a cada 250 m) ficam travados em chao reto. Buraco
+largo demais pro pulo na velocidade da fase (ou subida de 2 niveis) fica em
+vermelho, com a explicacao na barra de baixo, e nao deixa salvar. As regras e o
+formato do arquivo estao em `jogo/fase.py`; o repositorio ja traz
+`fases/avenida_do_caos.json`. Moeda de fase nao vai pro cofre.
+
+## Multiplayer: placar da LAN
+
+Cada um joga a propria partida; o ranking e de todos que estao na rede.
+
+- **Hospedar placar livre**: vale a melhor partida de cada um no modo infinito.
+- **Hospedar desafio** (`<`/`>` mudam os minutos): todo mundo joga o mesmo mapa
+  (mesma semente), ou uma fase do editor em **Desafio na fase**.
+- **Entrar**: as salas da rede aparecem sozinhas (broadcast UDP na porta
+  50506); se nao aparecerem, use **Entrar por IP** (o IP do anfitriao aparece
+  na sala). A conversa e por TCP na porta 50505.
+
+Na sala aparece o ranking ao vivo (com quem esta jogando agora). Na partida, o
+HUD mostra a posicao e quanto falta pra passar o proximo. O servidor recusa
+resultado impossivel (mais rapido que a velocidade maxima, conta de pontos que
+nao fecha, outro mapa no desafio) e guarda o ranking em `placar_lan.json`. Na
+primeira vez o sistema pode perguntar se o Python pode receber conexoes: tem que
+permitir na maquina do anfitriao.
 
 ## Poderes
 
@@ -115,8 +167,14 @@ jogo/loja.py         catalogo, regras de compra e tela da loja
 jogo/progresso.py    moedas, compras, recorde e som guardados em progresso.json
 jogo/entidades.py    Corpo, Box, Zumbi, Humano, Obstaculo, Moeda
 jogo/cenario.py      fundos em paralaxe, tunel de troca e paleta do chao
-jogo/mundo.py        geracao procedural das plataformas, obstaculos e itens
+jogo/mundo.py        o mundo da corrida e o gerador procedural (com semente)
 jogo/jogo.py         loop principal, estados, poderes, colisoes e HUD
+jogo/telas.py        menus: inicial, pausa, configuracoes, fases, multiplayer, sala
+jogo/fase.py         fase do editor: formato, validacao e GeradorDeFase
+jogo/editor.py       editor de fases (comandos com desfazer/refazer)
+rede/                placar da LAN: protocolo, servidor, cliente e descoberta UDP
+fases/               fases salvas pelo editor (JSON)
+docs/GDD.md          game design document
 ferramentas/         importador dos sprites, geradores dos fundos (SVG), da
                      caixa/baloes/ima (PNG) e dos efeitos sonoros (WAV)
 CREDITOS.md          de onde vem cada sprite e a licenca de cada um
@@ -211,20 +269,32 @@ com as cores do chao. So o `_ceu` e obrigatorio; qualquer altura serve, a
 imagem e ajustada pra 540 px. A ordem de `TEMAS` e a ordem em que os cenarios
 aparecem. Sem a pasta `assets/fundos`, o jogo volta pro fundo de formas.
 
-## Sons
+## Sons e musica
 
-Os efeitos ficam em `assets/sons/*.wav` e sao sintetizados por codigo, so com
-a biblioteca padrao do Python (ondas simples + ruido + envelope, mono, 16
-bits, 22050 Hz):
+Os efeitos e a musica tema sao sons **CC0 baixados da web** (OpenGameArt e
+pacotes do Kenney); a origem e o autor de cada um estao no
+[CREDITOS.md](CREDITOS.md). `ferramentas/importar_sons.py` recorta, mistura e
+normaliza os trechos escolhidos (tabela `SONS`) em WAV mono em `assets/sons/`
+e copia a musica pra `assets/musica/tema.mp3`:
 
 ```bash
-./venv/bin/python ferramentas/gerar_sons.py
+./venv/bin/python ferramentas/importar_sons.py /pasta/com/os/downloads
 ```
 
-Cada som e uma funcao em `SONS`, dentro do script. Pra usar um som pronto,
-basta trocar o WAV de mesmo nome. Volumes e o intervalo minimo entre dois
-toques do mesmo efeito ficam em `jogo/sons.py`. Sem placa de som ou sem a
-pasta `assets/sons`, o jogo roda mudo.
+| Som | Quando toca |
+|-----|-------------|
+| `corrida` | loop de passos enquanto a horda corre no chao (mais alto quanto maior a horda) |
+| `mordida` + `zumbi_*` | humano mordido vira zumbi e ja levanta gemendo |
+| `zumbi_*` | gemidos da horda de vez em quando |
+| `grito_*` | humano ve a horda chegando e sai correndo |
+| `batida` / `quebra` | zumbi bate no carro / o carro quebra (ou o gigante/dragao arrebenta) |
+| `parede`, `explosao`, `pulo`, `moeda`, `poder`, `fim`, `clique` | o resto da partida e dos menus |
+
+Nome com `_1`, `_2`... e variacao: o jogo sorteia uma a cada vez. Volumes e
+intervalos minimos ficam em `jogo/sons.py`. Musica e efeitos se ligam e
+desligam separados em Configuracoes (`M` alterna os efeitos na partida). Sem
+placa de som ou sem os arquivos, o jogo roda mudo. Os sons sintetizados da
+primeira versao (`ferramentas/gerar_sons.py`) ficaram no repositorio como historico.
 
 ## Regras de geracao (balanceamento)
 
@@ -243,8 +313,7 @@ O alcance do pulo e `velocidade * tempo_no_ar`. A partir dele:
 ## Proximos passos
 
 - sprites de carros e moedas (ainda desenhados com formas)
-- trilha sonora
 - mais monstros na loja (lobisomem, vampiro): falta achar arte livre no
   mesmo traco
 - predios pra escalar
-- tela de melhores pontuacoes
+- tela de creditos dentro do jogo

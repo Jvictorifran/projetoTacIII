@@ -1,4 +1,4 @@
-# Creditos da arte
+# Creditos da arte, dos sons e da musica
 
 ## Personagens (zumbis, pessoas e monstros)
 
@@ -43,7 +43,34 @@ Os SVG estao em `ferramentas/icones/`; o selo colorido em volta e nosso.
 | `loja_chance` | heart-plus | Zeromancer |
 | `loja_cadeado` | padlock | Lorc |
 
+## Musica tema
+
+`assets/musica/tema.mp3` - **Spooky Action Loop ("Hallow Quest")**, de Zane Little Music,
+[OpenGameArt](https://opengameart.org/content/spooky-action-loop-hallow-quest) - **CC0**.
+
+## Efeitos sonoros
+
+Todos baixados do OpenGameArt com licenca **CC0** (conferida na pagina de cada um) e
+recortados/misturados por `ferramentas/importar_sons.py` (a tabela `SONS` diz o trecho de
+cada arquivo). Credito nao e exigido; fica aqui por cortesia.
+
+| Som em `assets/sons/` | Origem | Autor |
+|-----------------------|--------|-------|
+| `mordida` | [7 Eating Crunches](https://opengameart.org/content/7-eating-crunches) + [Crunchy bite](https://opengameart.org/content/crunchy-bite) | StarNinjas, fvcalderan |
+| `zumbi_1` a `zumbi_4`, camada do `fim` | [Zomby sfx pack](https://opengameart.org/content/zomby-sfx-pack) | saturn91 |
+| `grito_1` | [Female Scream 1](https://opengameart.org/content/female-scream-1) | Nocturnal_Vanguard |
+| `grito_2` | [High pitch scream sounds(2)](https://opengameart.org/content/high-pitch-scream-sounds2) | pauliuw |
+| `batida` | [Crash Collision](https://opengameart.org/content/crash-collision) + [75 CC0 breaking / falling / hit sfx](https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx) | qubodup, rubberduck |
+| `quebra` | [Glass Break](https://opengameart.org/content/glass-break) + 75 CC0 breaking sfx | Till Behrend, rubberduck |
+| `parede` | 75 CC0 breaking / falling / hit sfx | rubberduck |
+| `explosao` | [Mechanical Explosion](https://opengameart.org/content/mechanical-explosion) | Spring Spring |
+| `corrida` (passos), `pulo`, `moeda` | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | Kenney |
+| `poder`, camada do `fim` | [63 Digital sound effects](https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc) | Kenney |
+| `clique` | [Interface Sounds](https://opengameart.org/content/interface-sounds) | Kenney |
+
+Os sons sintetizados da primeira versao (`ferramentas/gerar_sons.py`) foram substituidos por
+estes; o gerador ficou no repositorio como historico.
+
 ## O resto
 
-Fundos, tunel, caixa, baloes, ima e efeitos sonoros sao gerados por codigo
-neste repositorio (`ferramentas/`).
+Fundos, tunel, caixa, baloes e ima sao gerados por codigo neste repositorio (`ferramentas/`).

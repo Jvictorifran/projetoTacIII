@@ -41,15 +41,27 @@ def tunel_perto(x):
     return k * cfg.TRECHO_CENARIO if k >= 1 else None
 
 
+def nomes():
+    return [t["nome"] for t in TEMAS]
+
+
 class Cenario:
-    def __init__(self):
+    def __init__(self, inicio=None):
         # so entra na roda o cenario que tem arte no disco
         self.temas = [t for t in TEMAS if recursos.fundo(t["nome"]) is not None]
+        self.inicio = 0             # posicao na roda do primeiro trecho
+        self.comecar_em(inicio)
+
+    def comecar_em(self, nome):
+        """Faz a corrida comecar no cenario `nome` (uma fase pode escolher)."""
+        nomes_ok = [t["nome"] for t in self.temas]
+        self.inicio = nomes_ok.index(nome) if nome in nomes_ok else 0
 
     def _tema_em(self, x):
         """Cenario do trecho em que o ponto x do mundo cai."""
         temas = self.temas or TEMAS[:1]
-        return temas[int(max(0.0, x) // cfg.TRECHO_CENARIO) % len(temas)]
+        trecho = int(max(0.0, x) // cfg.TRECHO_CENARIO) + self.inicio
+        return temas[trecho % len(temas)]
 
     def paleta_em(self, x):
         """Cores do chao no ponto x do mundo."""
